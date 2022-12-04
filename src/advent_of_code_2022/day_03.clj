@@ -7,7 +7,7 @@
 (def priorities (reduce-kv (fn [a i v]
                              (assoc a v i))
                            {}
-                           (into [] (flatten (partition 1 "0abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")))))
+                           (into [] (map identity "0abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))))
 
 (defn solve-a
   {:test (fn []
@@ -26,7 +26,7 @@
   [input]
   (reduce (fn [a group]
             (+ a (-> (apply clojure.set/intersection (map (fn [line]
-                                                            (set (flatten (partition 1 line))))
+                                                            (set (map identity line)))
                                                           group))
                      (first)
                      (priorities))))
