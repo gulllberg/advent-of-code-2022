@@ -30,8 +30,6 @@
                            (into []))]
     [configuration instructions]))
 
-(parse-input test-input 3)
-
 (defn solve-a
   {:test (fn []
            (is= (solve-a test-input 3) "CMZ"))}
