@@ -77,8 +77,7 @@
            (is= (solve-b test-input) 29))}
   [input]
   (let [{start :start goals :goals heights :heights} (parse-input input \E (int \z) #{\S \a} (int \a))]
-    (find-shortest-path (get-connections heights true) start goals))
-  )
+    (find-shortest-path (get-connections heights true) start goals)))
 
 (comment
   (solve-a input)
