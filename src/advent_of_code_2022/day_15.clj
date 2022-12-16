@@ -17,33 +17,49 @@
   (+ (abs (- (first p1) (first p2)))
      (abs (- (second p1) (second p2)))))
 
-(defn find-position't
-  [sensor-readings]
-  (reduce (fn [a v]
-            (disj a v))
-          (reduce (fn [a reading]
-                    ;(println reading)
-                    (let [sensor-position (first reading)
-                          beacon-position (second reading)
-                          distance (get-manhattan-distance sensor-position beacon-position)]
-                      (reduce conj a (for [x (range (- (first sensor-position) distance) (+ (first sensor-position) distance 1))
-                                           y (range (- (second sensor-position) distance) (+ (second sensor-position) distance 1))
-                                           :when (<= (get-manhattan-distance sensor-position [x y]) distance)]
-                                       [x y]))))
-                  #{}
-                  sensor-readings)
-          (map second sensor-readings)))
+(defn get-sensor-beacon-distances
+  [readings]
+  (reduce (fn [a [sensor-p beacon-p]]
+            (assoc a sensor-p (get-manhattan-distance sensor-p beacon-p)))
+          {}
+          readings))
+
+;(defn find-position't
+;  [sensor-readings]
+;  (reduce (fn [a v]
+;            (disj a v))
+;          (reduce (fn [a reading]
+;                    (let [sensor-position (first reading)
+;                          beacon-position (second reading)
+;                          distance (get-manhattan-distance sensor-position beacon-position)]
+;                      (reduce conj a (for [x (range (- (first sensor-position) distance) (+ (first sensor-position) distance 1))
+;                                           y (range (- (second sensor-position) distance) (+ (second sensor-position) distance 1))
+;                                           :when (<= (get-manhattan-distance sensor-position [x y]) distance)]
+;                                       [x y]))))
+;                  #{}
+;                  sensor-readings)
+;          (map second sensor-readings)))
+
+(defn possible?
+  [sensor-beacon-distances position]
+  )
 
 (defn solve-a
   {:test (fn []
            (is= (solve-a test-input 10) 26))}
   [input row-to-check]
-  (->> input
-       (parse-input)
-       (find-position't)
-       (filter (fn [p]
-                 (= row-to-check (second p))))
-       (count)))
+  (let [readings (parse-input input)
+        beacon-positions (into #{} (map second readings))
+        sensor-beacon-distances (get-sensor-beacon-distances readings)
+        max-distance (apply max (vals sensor-beacon-distances))
+        min-x (apply min (map first (keys sensor-beacon-distances)))
+        max-x (apply max (map first (keys sensor-beacon-distances)))]
+    (reduce (fn [a x]
+              (let [position [x row-to-check]]
+                ))
+            0
+            (range (- min-x max-distance) (+ max-x max-distance 1)))))
+
 
 (defn solve-b
   {:test (fn []
