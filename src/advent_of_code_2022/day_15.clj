@@ -24,22 +24,6 @@
           {}
           readings))
 
-(defn find-position't
-  [sensor-readings]
-  (reduce (fn [a v]
-            (disj a v))
-          (reduce (fn [a reading]
-                    (let [sensor-position (first reading)
-                          beacon-position (second reading)
-                          distance (get-manhattan-distance sensor-position beacon-position)]
-                      (reduce conj a (for [x (range (- (first sensor-position) distance) (+ (first sensor-position) distance 1))
-                                           y (range (- (second sensor-position) distance) (+ (second sensor-position) distance 1))
-                                           :when (<= (get-manhattan-distance sensor-position [x y]) distance)]
-                                       [x y]))))
-                  #{}
-                  sensor-readings)
-          (map second sensor-readings)))
-
 (defn possible?
   [sensor-beacon-distances position]
   (reduce (fn [_ [sensor-p distance]]
@@ -68,10 +52,17 @@
             0
             (range (- min-x max-distance) (+ max-x max-distance 1)))))
 
+(defn valid-position?
+  [[x y] max-coord]
+  (and (>= x 0)
+       (>= y 0)
+       (<= x max-coord)
+       (<= y max-coord)))
+
 (defn get-perimeter-positions
-  [sensor-position distance]
+  [sensor-position distance max-coord]
   (let [starting-position (mapv + sensor-position [distance 0])]
-    (loop [positions #{starting-position}
+    (loop [positions (if (valid-position? starting-position max-coord) #{starting-position} #{})
            previous-position starting-position]
       (let [direction (cond
                         (and (> (first previous-position) (first sensor-position))
@@ -82,16 +73,19 @@
                              (> (second previous-position) (second sensor-position)))
                         [-1 -1]
 
-                        (and (> (first previous-position) (first sensor-position))
-                             (>= (second previous-position) (second sensor-position)))
-                        [-1 -1]
+                        (and (< (first previous-position) (first sensor-position))
+                             (<= (second previous-position) (second sensor-position)))
+                        [1 -1]
 
                         :else
-                        [-1 -1])
+                        [1 1])
             new-position (mapv + previous-position direction)]
         (if (= new-position starting-position)
           positions
-          (recur (conj positions new-position) new-position))))))
+          (recur (if (valid-position? new-position max-coord)
+                   (conj positions new-position)
+                   positions)
+                 new-position))))))
 
 (defn get-tuning-frequency
   [x y]
@@ -104,18 +98,7 @@
   (let [readings (parse-input input)
         sensor-beacon-distances (get-sensor-beacon-distances readings)]
     (reduce (fn [_ [sensor-p distance]]
-              (println sensor-p distance)
-              (println (- (+ (first sensor-p) distance 1) (- (first sensor-p) distance)))
-              (println (- (+ (second sensor-p) distance 1) (- (second sensor-p) distance)))
-              (let [perimeter-positions (for [x (range (- (first sensor-p) distance) (+ (first sensor-p) distance 1))
-                                              y (range (- (second sensor-p) distance) (+ (second sensor-p) distance 1))
-                                              :when (and (>= x 0)
-                                                         (>= y 0)
-                                                         (<= x max-coord)
-                                                         (<= y max-coord)
-                                                         (= (get-manhattan-distance sensor-p [x y]) distance))]
-                                          [x y])]
-                (println (count perimeter-positions))
+              (let [perimeter-positions (get-perimeter-positions sensor-p distance max-coord)]
                 (if-let [result (reduce (fn [_ [x y]]
                                           (if (possible? sensor-beacon-distances [(inc x) y])
                                             (reduced [(inc x) y])
@@ -133,5 +116,6 @@
   ; "Elapsed time: 10454.607125 msecs"
 
   (time (solve-b input 4000000))
-  ;
+  ; 10961118625406
+  ; "Elapsed time: 28527.998125 msecs"
   )
