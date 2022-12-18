@@ -142,6 +142,22 @@
                                  "."))
                              (range 1 8))))))
 
+(defn cycle?
+  [cycles jet-n-mod]
+  (contains? cycles jet-n-mod))
+
+(defn get-where-to-go-after-cycle
+  [cycles jet-n-mod shape-n tower-height occupied n-rocks]
+  (let [[last-shape-n last-tower-height] (get cycles jet-n-mod)
+        cycle-length (- shape-n last-shape-n)
+        n-cycles-to-skip (quot (- n-rocks shape-n) cycle-length)
+        tower-height-increase (* (- tower-height last-tower-height) n-cycles-to-skip)]
+    [(+ shape-n (* cycle-length n-cycles-to-skip))
+     (+ tower-height tower-height-increase)
+     (into #{} (map (fn [o]
+                      (mapv + o [0 tower-height-increase]))
+                    occupied))]))
+
 (defn tetris
   [input n-rocks]
   (let [jets (clojure.string/split (clojure.string/replace input #"\n" "") #"")
@@ -150,24 +166,44 @@
            shape-n 0
            tower-height 0
            position nil
-           occupied #{[1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]}]
-      (if (= shape-n n-rocks)
-        tower-height
-        (let [jet (nth jets (mod jet-n (count jets)))
-              shape (nth shapes (mod shape-n 5))
-              position (if position position [3 (+ tower-height 4)])
-              position (apply-jet occupied shape position jet)]
-          (if (can-move-down? occupied shape position)
-            (recur (inc jet-n)
-                   shape-n
-                   tower-height
-                   (mapv + position [0 -1])
-                   occupied)
-            (recur (inc jet-n)
-                   (inc shape-n)
-                   (get-new-tower-height tower-height shape position)
+           occupied #{[1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]}
+           cycles {}]
+      (let [jet-n-mod (mod jet-n (count jets))
+            jet (nth jets jet-n-mod)
+            shape (nth shapes (mod shape-n 5))
+            should-check-cycle (and (nil? position)
+                                    (= shape :square)
+                                    ;; Since we start with a flat surface wait until at least a full period of rocks/jets have finished before checking for cycles (might not be 100% correct either, but works)
+                                    (> shape-n (* (count jets) (count shapes))))]
+        (cond
+          (= shape-n n-rocks)
+          tower-height
+
+          (and should-check-cycle (cycle? cycles jet-n-mod))
+          (let [[new-shape-n new-tower-height new-occupied] (get-where-to-go-after-cycle cycles jet-n-mod shape-n tower-height occupied n-rocks)]
+            (recur jet-n
+                   new-shape-n
+                   new-tower-height
                    nil
-                   (get-new-occupied occupied shape position))))))))
+                   new-occupied
+                   {}))
+          :else
+          (let [position (if position position [3 (+ tower-height 4)])
+                position (apply-jet occupied shape position jet)]
+            (if (can-move-down? occupied shape position)
+              (recur (inc jet-n)
+                     shape-n
+                     tower-height
+                     (mapv + position [0 -1])
+                     occupied
+                     (if should-check-cycle (assoc cycles jet-n-mod [shape-n tower-height]) cycles))
+              (recur (inc jet-n)
+                     (inc shape-n)
+                     (get-new-tower-height tower-height shape position)
+                     nil
+                     (get-new-occupied occupied shape position)
+                     ;; At start of cycle can always move down - no need to update cycles here since we will be in truthy if-case
+                     cycles))))))))
 
 (defn solve-a
   {:test (fn []
@@ -175,18 +211,16 @@
   [input]
   (tetris input 2022))
 
-
 (defn solve-b
   {:test (fn []
            (is= (solve-b test-input) 1514285714288))}
   [input]
-  ;(tetris input 1000000000000)
-  )
+  (tetris input 1000000000000))
 
 (comment
   (solve-a input)
   ; 3235
 
   (solve-b input)
-  ;
+  ; 1591860465110
   )
