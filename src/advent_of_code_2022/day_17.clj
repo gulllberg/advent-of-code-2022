@@ -184,7 +184,7 @@
   )
 
 (comment
-  (time (solve-a input))
+  (solve-a input)
   ; 3235
 
   (solve-b input)
