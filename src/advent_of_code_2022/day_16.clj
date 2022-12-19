@@ -15,43 +15,64 @@
                {})))
 
 (defn get-branching-states
-  [nodes [position open-valves] [score best-ignored] time-remaining]
+  [nodes [position open-valves] score time-remaining]
   (let [flow-rate (get-in nodes [position :flow-rate])]
     (reduce (fn [a c]
-              (assoc a [c open-valves] [score (max best-ignored (if (contains? open-valves position) 0 flow-rate))]))
+              (assoc a [c open-valves] score))
             (if (or (contains? open-valves position)
-                    (<= flow-rate best-ignored))
+                    (= flow-rate 0))
               {}
-              {[position (conj open-valves position)] [(+ score (* (dec time-remaining) flow-rate)) 0]})
+              {[position (conj open-valves position)] (+ score (* (dec time-remaining) flow-rate))})
             (get-in nodes [position :connections]))))
+
+(defn find-best-states
+  [nodes states time-remaining]
+  (loop [time-remaining time-remaining
+         ; {[position open-valves] score}
+         states states]
+    (println time-remaining (count states))
+    (if (= 0 time-remaining)
+      states
+      (recur (dec time-remaining) (reduce-kv (fn [a [position open-valves] score]
+                                               (reduce-kv (fn [a k v]
+                                                            (let [existing-score (get a k -1)]
+                                                              (if (>= existing-score v)
+                                                                a
+                                                                (assoc a k v))))
+                                                          a
+                                                          (get-branching-states nodes [position open-valves] score time-remaining)))
+                                             {}
+                                             states)))))
 
 (defn solve-a
   {:test (fn []
            (is= (solve-a test-input) 1651))}
   [input]
   (let [nodes (parse-input input)]
-    (loop [time-remaining 30
-           ; {[position open-valves] [score best-ignored]}
-           states {["AA" #{}] [0 0]}]
-      (println time-remaining (count states))
-      (if (= 0 time-remaining)
-        (apply max (map first (vals states)))
-        (recur (dec time-remaining) (reduce-kv (fn [a [position open-valves] [score best-ignored]]
-                                                 (reduce-kv (fn [a k v]
-                                                              (let [[existing-score _] (get a k [-1 "whatever"])]
-                                                                (if (>= existing-score (first v))
-                                                                  a
-                                                                  (assoc a k v))))
-                                                            a
-                                                            (get-branching-states nodes [position open-valves] [score best-ignored] time-remaining)))
-                                               {}
-                                               states))))))
+    (->> (find-best-states nodes {["AA" #{}] 0} 30)
+         (vals)
+         (apply max))))
 
 (defn solve-b
   {:test (fn []
            (is= (solve-b test-input) 1707))}
   [input]
-  1)
+  (let [nodes (parse-input input)
+        _ (println "first go")
+        states-after-one-go (find-best-states nodes {["AA" #{}] 0} 26)
+        _ (println "second go")]
+    (->> (find-best-states nodes
+                           (reduce-kv (fn [a k v]
+                                        (let [new-k ["AA" (second k)]
+                                              existing-score (get a new-k -1)]
+                                          (if (>= existing-score v)
+                                            a
+                                            (assoc a new-k v))))
+                                      {}
+                                      states-after-one-go)
+                           26)
+         (vals)
+         (apply max))))
 
 (comment
   (time (solve-a input))
@@ -59,5 +80,6 @@
   ; "Elapsed time: 1334.628125 msecs"
 
   (time (solve-b input))
-  ;
+  ; 2469
+  ; "Elapsed time: 54968.148834 msecs"
   )
