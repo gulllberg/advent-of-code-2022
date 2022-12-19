@@ -15,20 +15,14 @@
                {})))
 
 (defn get-branching-states
-  [nodes state time-remaining]
-  (let [position (:position state)
-        flow-rate (get-in nodes [position :flow-rate])]
+  [nodes [position open-valves] [score best-ignored] time-remaining]
+  (let [flow-rate (get-in nodes [position :flow-rate])]
     (reduce (fn [a c]
-              (conj a (-> state
-                          (assoc :position c)
-                          (update :best-ignored max (if (contains? (:open-valves state) position) 0 flow-rate)))))
-            (if (or (contains? (:open-valves state) position)
-                    (<= flow-rate (:best-ignored state)))
-              #{}
-              #{(-> state
-                    (update :open-valves conj position)
-                    (assoc :best-ignored 0)
-                    (update :score + (* (dec time-remaining) flow-rate)))})
+              (assoc a [c open-valves] [score (max best-ignored (if (contains? open-valves position) 0 flow-rate))]))
+            (if (or (contains? open-valves position)
+                    (<= flow-rate best-ignored))
+              {}
+              {[position (conj open-valves position)] [(+ score (* (dec time-remaining) flow-rate)) 0]})
             (get-in nodes [position :connections]))))
 
 (defn solve-a
@@ -37,55 +31,32 @@
   [input]
   (let [nodes (parse-input input)]
     (loop [time-remaining 30
-           states #{{:position "AA" :open-valves #{} :best-ignored 0 :score 0}}]
+           ; {[position open-valves] [score best-ignored]}
+           states {["AA" #{}] [0 0]}]
       (println time-remaining (count states))
       (if (= 0 time-remaining)
-        (apply max (map :score states))
-        (recur (dec time-remaining) (reduce clojure.set/union (map (fn [state]
-                                                                     (get-branching-states nodes state time-remaining))
-                                                                   states)))))))
+        (apply max (map first (vals states)))
+        (recur (dec time-remaining) (reduce-kv (fn [a [position open-valves] [score best-ignored]]
+                                                 (reduce-kv (fn [a k v]
+                                                              (let [[existing-score _] (get a k [-1 "whatever"])]
+                                                                (if (>= existing-score (first v))
+                                                                  a
+                                                                  (assoc a k v))))
+                                                            a
+                                                            (get-branching-states nodes [position open-valves] [score best-ignored] time-remaining)))
+                                               {}
+                                               states))))))
 
 (defn solve-b
   {:test (fn []
-           (is= (solve-b test-input) 1))}
+           (is= (solve-b test-input) 1707))}
   [input]
   1)
 
 (comment
   (time (solve-a input))
   ; 1940
-  ; "Elapsed time: 236141.871125 msecs"
-  ;30 1
-  ;29 5
-  ;28 6
-  ;27 23
-  ;26 47
-  ;25 93
-  ;24 173
-  ;23 320
-  ;22 591
-  ;21 1033
-  ;20 1870
-  ;19 3260
-  ;18 5697
-  ;17 9970
-  ;16 17125
-  ;15 29472
-  ;14 49878
-  ;13 84399
-  ;12 141002
-  ;11 234282
-  ;10 386391
-  ;9 631463
-  ;8 1025523
-  ;7 1648143
-  ;6 2625107
-  ;5 4136770
-  ;4 6444099
-  ;3 9913705
-  ;2 15041482
-  ;1 22478796
-  ;0 33048506
+  ; "Elapsed time: 1334.628125 msecs"
 
   (time (solve-b input))
   ;
