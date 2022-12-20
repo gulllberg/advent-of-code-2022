@@ -15,32 +15,36 @@
                {})))
 
 (defn get-branching-states
-  [nodes [position open-valves] score time-remaining]
+  [nodes [position open-valves] [score visited] time-remaining]
   (let [flow-rate (get-in nodes [position :flow-rate])]
     (reduce (fn [a c]
-              (assoc a [c open-valves] score))
+              ; Can't walk again to where you already visited (unless you opened a valve since)
+              (if (contains? visited c)
+                a
+                (assoc a [c open-valves] [score (conj visited c)])))
             (if (or (contains? open-valves position)
                     (= flow-rate 0))
               {}
-              {[position (conj open-valves position)] (+ score (* (dec time-remaining) flow-rate))})
+              {[position (conj open-valves position)] [(+ score (* (dec time-remaining) flow-rate)) #{position}]})
             (get-in nodes [position :connections]))))
 
 (defn find-best-states
   [nodes states time-remaining]
   (loop [time-remaining time-remaining
-         ; {[position open-valves] score}
+         ; {[position open-valves] [score visited]}
          states states]
     (println time-remaining (count states))
     (if (= 0 time-remaining)
       states
-      (recur (dec time-remaining) (reduce-kv (fn [a [position open-valves] score]
-                                               (reduce-kv (fn [a k v]
-                                                            (let [existing-score (get a k -1)]
-                                                              (if (>= existing-score v)
-                                                                a
-                                                                (assoc a k v))))
-                                                          a
-                                                          (get-branching-states nodes [position open-valves] score time-remaining)))
+      (recur (dec time-remaining) (reduce-kv (fn [a [position open-valves] [score visited]]
+                                               (let [branching-states (get-branching-states nodes [position open-valves] [score visited] time-remaining)]
+                                                 (reduce-kv (fn [a k v]
+                                                              (let [[existing-score] (get a k [-1])]
+                                                                (if (>= existing-score (first v))
+                                                                  a
+                                                                  (assoc a k v))))
+                                                            a
+                                                            (if (= 0 (count branching-states)) {[position open-valves] [score visited]} branching-states))))
                                              {}
                                              states)))))
 
@@ -49,9 +53,30 @@
            (is= (solve-a test-input) 1651))}
   [input]
   (let [nodes (parse-input input)]
-    (->> (find-best-states nodes {["AA" #{}] 0} 30)
+    (->> (find-best-states nodes {["AA" #{}] [0 #{"AA"}]} 30)
          (vals)
+         (map first)
          (apply max))))
+
+;; assumes all states in same position
+(defn trim-states
+  [states]
+  (let [keys (keys states)]
+    (reduce-kv (fn [a k v]
+                 ; If at least as good score with opening fewer valves it is a strictly better state
+                 ; (Better score with same valves is also strictly better, but already handled outside this function)
+                 (let [k-fewer-open-valves (filter (fn [other-k]
+                                                     (and (clojure.set/subset? (second other-k) (second k))
+                                                          (< (count (second other-k)) (count (second k)))))
+                                                   keys)
+                       has-better-score (some (fn [other-k]
+                                                (<= (first v) (get-in states [other-k 0])))
+                                              k-fewer-open-valves)]
+                   (if has-better-score
+                     a
+                     (assoc a k v))))
+               {}
+               states)))
 
 (defn solve-b
   {:test (fn []
@@ -59,19 +84,20 @@
   [input]
   (let [nodes (parse-input input)
         _ (println "first go")
-        states-after-one-go (find-best-states nodes {["AA" #{}] 0} 26)
+        states-after-one-go (find-best-states nodes {["AA" #{}] [0 #{"AA"}]} 26)
         _ (println "second go")]
     (->> (find-best-states nodes
-                           (reduce-kv (fn [a k v]
-                                        (let [new-k ["AA" (second k)]
-                                              existing-score (get a new-k -1)]
-                                          (if (>= existing-score v)
-                                            a
-                                            (assoc a new-k v))))
-                                      {}
-                                      states-after-one-go)
+                           (trim-states (reduce-kv (fn [a k v]
+                                                     (let [new-k ["AA" (second k)]
+                                                           [existing-score] (get a new-k [-1])]
+                                                       (if (>= existing-score (first v))
+                                                         a
+                                                         (assoc a new-k [(first v) #{"AA"}]))))
+                                                   {}
+                                                   states-after-one-go))
                            26)
          (vals)
+         (map first)
          (apply max))))
 
 (comment
@@ -81,5 +107,5 @@
 
   (time (solve-b input))
   ; 2469
-  ; "Elapsed time: 54968.148834 msecs"
+  ; "Elapsed time: 43737.954084 msecs"
   )
